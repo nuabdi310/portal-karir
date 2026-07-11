@@ -10,26 +10,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # Ambil source code
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      # Install Node
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - run: npm ci
+      # Install dependency
+      - name: Install dependencies
+        run: npm ci
 
-      - run: npm run build
+      # Build Vue/Vite
+      - name: Build frontend
+        run: npm run build
 
-      - name: Copy dist to VPS
+      # Siapkan folder di VPS
+      - name: Prepare VPS directory
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            sudo mkdir -p /var/www/career
+            sudo rm -rf /var/www/career/*
+            sudo chown -R $USER:$USER /var/www/career
+
+      # Upload hasil build
+      - name: Upload dist to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
-          source: "dist/*"
+          source: "dist/"
           target: "/var/www/career/"
+          strip_components: 1
 
-      - name: Fix permissions
+      # Set permission untuk Nginx
+      - name: Set permissions
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.HOST }}
@@ -37,3 +61,4 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             sudo chown -R www-data:www-data /var/www/career
+            sudo chmod -R 755 /var/www/career
